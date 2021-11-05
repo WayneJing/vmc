@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ -z "$(which fzf | grep not)" ]; then
+        export FZF_EXIST=1
+else
+        export FZF_EXIST=0
+fi
 #### get vm ip from vm name
 _get_vm_ip ()
 {
@@ -60,26 +65,59 @@ _list_vm()
 #### match vm list
 _match_vmlist()
 {
+        # matching string end with *
         if [[ "$2" =~ [*\*$] ]];
         then
                 local key=${2%\*}
-                vmlist=$(echo "$vmlist" | grep $key)
+                # matching string start with key
+                vmlist=$(echo "$vmlist" | grep "^$key")
         else
-                vmlist=$2
+                _fuzzer_filter_vm $@
         fi
 }
 
+#### filter vm via fuzzer matching
+_fuzzer_filter_vm()
+{
+        if [ 0 -eq $FZF_EXIST ]; then
+                vmlist=$2
+                return 0
+        fi
+        if [ -z "$2" ]; then
+                vmlist=$(echo "$vmlist" | fzf)
+        elif [ 0 -eq $(echo $2 | grep -cEi "[a-zA-Z]+") ]; then
+                if [ -z $(echo "$1" | grep -E "[(connect)|(console)]") ]; then
+                        vmlist=$(echo $vmlist | grep -E "vats-test.*-$(printf "%02d" $2)")
+                else
+                        local arr=()
+                        for i in $(seq 1 $2);
+                        do
+                                local tmp=$(echo "$vmlist" | grep -E "vats-test.*-$(printf "%02d" $i)")
+                                echo $tmp
+                                arr+=("$tmp")
+                        done
+                        vmlist=$arr
+                fi
+        fi
+
+}
 ### connect virtual machine
 _connect_vm()
 {
-        state=$(virsh domstate $2)
+        vmlist=$(virsh list --name)
+        _fuzzer_filter_vm $@
+        if [ -z "$vmlist" ]; then
+                echo "no matched vm"
+                return -1
+        fi
+        state=$(virsh domstate $vmlist)
         if [ "$state" == "running" ];
         then
                 ip=""
                 while [ ! -n "$ip" ]
                 do
                         sleep 1
-                        _get_vm_ip $2
+                        _get_vm_ip $vmlist
                 done
                 until nc -vzw 2 $ip 22; do sleep 2; done
                 sshpass -p amd1234 ssh -o StrictHostKeyChecking=no root@$ip
