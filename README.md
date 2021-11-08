@@ -3,6 +3,10 @@
 ## TODO
 
 - [ ] beautiful print for vmc list
-- [ ] attach/detach vf by virt-xml
+- [x] attach/detach vf by virt-xml
 - [ ] attach/detach disk by virt-xml
 - [ ] create vm by virt-clone
+
+## Guides
+
+### List VMs
