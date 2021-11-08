@@ -27,6 +27,15 @@ _get_vm_pci ()
         pci="$domain:$bus:$slot.$function"
 }
 
+_finder_wrapper()
+{
+        if [ 1 -eq $FZF_EXIST ]; then
+                fzf -q "$1"
+        else
+                grep -E "$1"
+        fi
+}
+
 ### list information of virtual machine
 _list_vm()
 {
@@ -184,6 +193,25 @@ _connect_vm_console()
         fi
 }
 
+### change attached vf device
+_change_dev()
+{
+
+        vmlist=$(virsh list --name)
+        _fuzzer_filter_vm $@
+        if [ -z "$vmlist" ];
+        then
+                echo "no matched vm"
+                return -1
+        fi
+
+        echo current device attached to $vmlist: $(_get_vm_pci "$vmlist")
+
+        virt-xml $vmlist --remove-device --host-dev all
+        pci=$(lspci -D| grep ATI | grep Display | _finder_wrapper "$3" | awk -F" " '{print $1}')
+        virt-xml $vmlist --add-device --host-dev $pci
+}
+
 ## vmc: virtual machine controller
 case $1 in
 "list")
@@ -201,5 +229,10 @@ case $1 in
 "console")
         _connect_vm_console $@
         ;;
+"change-dev")
+        _change_dev $@
+        ;;
+*)
+        echo command undefined!
 esac
 
