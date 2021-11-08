@@ -29,11 +29,14 @@ _get_vm_pci ()
 
 _finder_wrapper()
 {
-        if [ 1 -eq $FZF_EXIST ]; then
-                fzf -q "$1"
-        else
-                grep -E "$1"
+        result=""
+        if [ -n "$1" ]; then
+                result=$(grep -E -m 1 "$1")
         fi
+        if [ -z "$result" ] && [ 1 -eq $FZF_EXIST ]; then
+                result=$(fzf -q "$1")
+        fi
+        echo "$result"
 }
 
 ### list information of virtual machine
@@ -79,42 +82,32 @@ _match_vmlist()
         then
                 local key=${2%\*}
                 # matching string start with key
-                vmlist=$(echo "$vmlist" | grep "^$key")
+                vmlist=$(echo "$vmlist" | grep -E "^$key")
         else
-                _fuzzer_filter_vm $@
-        fi
-}
-
-#### filter vm via fuzzer matching
-_fuzzer_filter_vm()
-{
-        if [ 0 -eq $FZF_EXIST ]; then
-                vmlist=$2
-                return 0
-        fi
-        if [ -z "$2" ]; then
-                vmlist=$(echo "$vmlist" | fzf)
-        elif [ 0 -eq $(echo $2 | grep -cEi "[a-zA-Z]+") ]; then
-                if [ -z $(echo "$1" | grep -E "[(connect)|(console)]") ]; then
-                        vmlist=$(echo $vmlist | grep -E "vats-test.*-$(printf "%02d" $2)")
+                if [ 0 -eq $(echo "$2" | grep -cEi "[a-zA-Z]+") ] && [ -n "$2" ]; then
+                        if [ -z $(echo "$1" | grep -E "[(connect)|(console)]") ]; then
+                                vmlist=$(echo $vmlist | grep -E "vats-test.*-$(printf "%02d" $2)")
+                        else
+                                local arr=()
+                                for i in $(seq 1 $2);
+                                do
+                                        local tmp=$(echo "$vmlist" | grep -E "vats-test.*-$(printf "%02d" $i)")
+                                        echo $tmp
+                                        arr+=("$tmp")
+                                done
+                                vmlist=$arr
+                        fi
                 else
-                        local arr=()
-                        for i in $(seq 1 $2);
-                        do
-                                local tmp=$(echo "$vmlist" | grep -E "vats-test.*-$(printf "%02d" $i)")
-                                echo $tmp
-                                arr+=("$tmp")
-                        done
-                        vmlist=$arr
+                        vmlist=$(echo "$vmlist" | _finder_wrapper "$2")
                 fi
         fi
-
 }
+
 ### connect virtual machine
 _connect_vm()
 {
         vmlist=$(virsh list --name)
-        _fuzzer_filter_vm $@
+        _match_vmlist $@
         if [ -z "$vmlist" ]; then
                 echo "no matched vm"
                 return -1
@@ -171,7 +164,7 @@ _destroy_vm()
 _connect_vm_console()
 {
         vmlist=$(virsh list --name)
-        _fuzzer_filter_vm $@
+        _match_vmlist $@
         if [ -z "$vmlist" ];
         then
                 echo "no matched vm"
@@ -198,7 +191,7 @@ _change_dev()
 {
 
         vmlist=$(virsh list --name)
-        _fuzzer_filter_vm $@
+        _match_vmlist $@
         if [ -z "$vmlist" ];
         then
                 echo "no matched vm"
@@ -208,8 +201,12 @@ _change_dev()
         echo current device attached to $vmlist: $pci
 
         virt-xml $vmlist --remove-device --host-dev all
-        pci=$(lspci -D| grep ATI | grep Display | _finder_wrapper "$3" | awk -F" " '{print $1}')
-        virt-xml $vmlist --add-device --host-dev $pci
+        pci=$(lspci -D| grep ATI | grep Display | _finder_wrapper "$3")
+        if [ -n "$pci" ]; then
+                virt-xml $vmlist --add-device --host-dev $(echo $pci | awk -F " " '{print $1}')
+        else
+                echo no pci-device attached
+        fi
 }
 
 ## vmc: virtual machine controller
