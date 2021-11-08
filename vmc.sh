@@ -33,11 +33,11 @@ _list_vm()
         vmlist=$(virsh list --all | sed '1,2d')
         if [ "$2" == "-v" ];
         then
-                printf "%-40s %-10s %-20s %-10s\n" "NAME" "STATE" "IP ADDRESS" "PCI DEVICE"
+                printf "%-60s %-10s %-20s %-10s\n" "NAME" "STATE" "IP ADDRESS" "PCI DEVICE"
         else
-                printf "%-40s %-10s %-20s %-10s\n" "NAME" "STATE" "IP ADDRESS"
+                printf "%-60s %-10s %-20s %-10s\n" "NAME" "STATE" "IP ADDRESS"
         fi
-        printf "=============================================================\n"
+        printf "============================================================================================\n"
         while read -r vminfo; do
                 name=$(echo "$vminfo" | awk '{print $2}')
                 state=$(echo "$vminfo" | awk '{print $3}')
@@ -55,9 +55,9 @@ _list_vm()
                 if [ "$2" == "-v" ];
                 then
                         _get_vm_pci "$name"
-                        printf "%-40s %-10s %-20s %-10s\n" "$name" "$state" "$ip" "$pci"
+                        printf "%-60s %-10s %-20s %-10s\n" "$name" "$state" "$ip" "$pci"
                 else
-                        printf "%-40s %-10s %-20s %-10s\n" "$name" "$state" "$ip"
+                        printf "%-60s %-10s %-20s %-10s\n" "$name" "$state" "$ip"
                 fi
         done <<< "$vmlist"
 }
@@ -158,6 +158,32 @@ _destroy_vm()
         fi
 }
 
+### connect to vm console
+_connect_vm_console()
+{
+        vmlist=$(virsh list --name)
+        _fuzzer_filter_vm $@
+        if [ -z "$vmlist" ];
+        then
+                echo "no matched vm"
+                return -1
+        fi
+        state=$(virsh domstate $vmlist)
+        if [ "$state" == "running" ];
+        then
+                ip=""
+                while [ ! -n "$ip" ]
+                do
+                        sleep 1
+                        _get_vm_ip $vmlist
+                done
+                until nc -vzw 2 $ip 22; do sleep 2; done
+                virsh console $vmlist --force
+        else
+                echo "VM is not running"
+        fi
+}
+
 ## vmc: virtual machine controller
 case $1 in
 "list")
@@ -171,6 +197,9 @@ case $1 in
         ;;
 "destroy")
         _destroy_vm $@
+        ;;
+"console")
+        _connect_vm_console $@
         ;;
 esac
 
