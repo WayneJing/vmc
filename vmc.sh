@@ -16,6 +16,10 @@ _get_vm_pci ()
 {
         local xml domain bus slot function
         xml=$(virsh dumpxml $1 | xmllint --xpath "//domain/devices/hostdev/source/address" -)
+        if [ -z "$xml" ]; then
+                pci=""
+                return 0
+        fi
         domain=$(echo "$xml" | xmllint --xpath "//@domain" - | \
         awk -F\= '{print $2}' | tr -d \" | awk -F\x '{print $2}')
         bus=$(echo "$xml" | xmllint --xpath "//@bus" - | \
