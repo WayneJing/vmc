@@ -194,7 +194,7 @@ _connect_vm_console()
 _change_dev()
 {
 
-        vmlist=$(virsh list --name)
+        vmlist=$(virsh list --name --all)
         _match_vmlist $@
         if [ -z "$vmlist" ];
         then
