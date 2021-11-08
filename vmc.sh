@@ -204,8 +204,8 @@ _change_dev()
                 echo "no matched vm"
                 return -1
         fi
-
-        echo current device attached to $vmlist: $(_get_vm_pci "$vmlist")
+        _get_vm_pci "$vmlist"
+        echo current device attached to $vmlist: $pci
 
         virt-xml $vmlist --remove-device --host-dev all
         pci=$(lspci -D| grep ATI | grep Display | _finder_wrapper "$3" | awk -F" " '{print $1}')
