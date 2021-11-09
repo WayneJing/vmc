@@ -242,7 +242,105 @@ _change_dev()
         fi
 }
 
+_help()
+{
+        case $1 in
+        "--help"| "-h")
+                echo "vmc <command> [args]"
+                echo ""
+                echo "commands:"
+                echo ""
+                printf "%-20s %-60s\n" "list" "list all virtual machines"
+                printf "%-20s %-60s\n" "start" "start one/multi virtual machines according to pattern"
+                printf "%-20s %-60s\n" "connect" "connect one virtual machine via ssh according to pattern"
+                printf "%-20s %-60s\n" "destroy" "destroy one/multi virtual machines according to pattern"
+                printf "%-20s %-60s\n" "console" "connect one virtual machine via console according to pattern"
+                printf "%-20s %-60s\n" "change-dev" "change the vf attached to the virtual machine"
+                printf "%-20s %-60s\n" "--help" "show this help document"
+                echo ""
+                echo "use vmc <command> --help to get detailed help"
+                ;;
+        "list")
+                echo "NAME"
+                echo "vmc list - list all virtual machines"
+                echo ""
+                echo "SYNOPSIS"
+                echo "vmc list [-v]"
+                echo ""
+                echo "DESCRIPTION"
+                echo "list all virtual machines' name, state and ip"
+                echo ""
+                echo "OPTION"
+                printf "%-20s %-60s\n" "-v" "show the vf device attached to the virtual machine"
+                ;;
+        "start")
+                echo "NAME"
+                echo "vmc start - start one/multi virtual machines according to pattern"
+                echo ""
+                echo "SYNOPSIS"
+                echo "vmc start <domain_name>           automatically start the VM"
+                echo "vmc start <num>                   automatically start the VM that matches vats-test.*-xx"
+                echo "vmc start <pattern>               automatically start the VM that starts with the pattern"
+                echo ""
+                echo "if fzf is installed"
+                echo "vmc start                         call fzf to interactively find which vm to start"
+                ;;
+        "destroy")
+                echo "NAME"
+                echo "vmc destroy - destroy one/multi virtual machines according to pattern"
+                echo ""
+                echo "SYNOPSIS"
+                echo "vmc destroy <domain_name>           automatically destroy the VM"
+                echo "vmc destroy <num>                   automatically destroy the VM that matches vats-test.*-xx"
+                echo "vmc destroy <pattern>               automatically destroy the VM that destroys with the pattern"
+                echo ""
+                echo "if fzf is installed"
+                echo "vmc destroy                         call fzf to interactively find which vm to destroy"
+                ;;
+        "connect")
+                echo "NAME"
+                echo "vmc connect - connect one virtual machine via ssh according to pattern"
+                echo ""
+                echo "SYNOPSIS"
+                echo "vmc connect <domain_name>           connect to the specific vm via ssh"
+                echo "vmc connect <num>                   automatically connect the VM that matches vats-test.*-xx"
+                echo ""
+                echo "if fzf is installed"
+                echo "vmc connect                         call fzf to interactively find which vm to connect"
+                ;;
+        "console")
+                echo "NAME"
+                echo "vmc console - connect one virtual machine via console according to pattern"
+                echo ""
+                echo "SYNOPSIS"
+                echo "vmc console <domain_name>           connect to the specific vm via console"
+                echo "vmc console <num>                   automatically connect the VM that matches vats-test.*-xx"
+                echo ""
+                echo "if fzf is installed"
+                echo "vmc console                         call fzf to interactively find which vm to connect"
+                ;;
+        "change-dev")
+                echo "NAME"
+                echo "vmc change-dev - change the vf attached to the virtual machine"
+                echo ""
+                echo "SYNOPSIS"
+                echo "vmc change-dev <domain_name> <pci_bdf>           change the specific vm to attach the specific device"
+                echo "vmc change-dev <num> <pci_bdf>                   change the VM that matches vats-test.*-xx"
+                echo ""
+                echo "if fzf is installed"
+                echo "vmc change-dev                                   call fzf to interactively find which vm to change and which device to attach"
+                ;;
+        *)
+                echo "command undefined! Please use vmc --help"
+                ;;
+        esac
+}
 ## vmc: virtual machine controller
+if [ "${@: -1}" == "--help" ] || [ "${@: -1}" == "-h" ]; then
+        _help $@
+        exit 0
+fi
+
 case $1 in
 "list")
         shift
@@ -269,7 +367,7 @@ case $1 in
         _change_dev $@
         ;;
 *)
-        echo command undefined!
+        echo "command undefined! Please use vmc --help"
 esac
 
 # clean and reset option
