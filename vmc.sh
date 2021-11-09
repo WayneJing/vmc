@@ -1,39 +1,50 @@
 #!/bin/bash
 
+# Prerequisite
+
+## check fzf
 if [ -z "$(which fzf | grep not)" ]; then
         export FZF_EXIST=1
 else
         export FZF_EXIST=0
 fi
-#### get vm ip from vm name
+
+## prevent wildcard expansion
+set -o noglob
+
+
+# glbal variable
+# ip: vm's ip address
+# pci: vm's pci device
+# vmlist: current vm's list
+
+# library
+
+## get vm ip from vm's name
+## $1: vm's name
 _get_vm_ip ()
 {
         ip=$(virsh domifaddr $1 | sed '1,2d' | awk '{print $4}')
         ip=${ip%/*}
 }
 
+## get vm pci dbsf from vm's name
+## $1: vm's name
 _get_vm_pci ()
 {
-        local xml domain bus slot function
+        local xml dbsf
         xml=$(virsh dumpxml $1 | xmllint --xpath "//domain/devices/hostdev/source/address" -)
         if [ -z "$xml" ]; then
                 pci=""
                 return 0
         fi
-        domain=$(echo "$xml" | xmllint --xpath "//@domain" - | \
-        awk -F\= '{print $2}' | tr -d \" | awk -F\x '{print $2}')
-        bus=$(echo "$xml" | xmllint --xpath "//@bus" - | \
-        awk -F\= '{print $2}' | tr -d \" | awk -F\x '{print $2}')
-        slot=$(echo "$xml" | xmllint --xpath "//@slot" - | \
-        awk -F\= '{print $2}' | tr -d \" | awk -F\x '{print $2}')
-        function=$(echo "$xml" | xmllint --xpath "//@function" - | \
-        awk -F\= '{print $2}' | tr -d \" | awk -F\x '{print $2}')
-        pci="$domain:$bus:$slot.$function"
+        dbsf=$(echo "$xml" |  awk -F'[=/< "]' '{print $5 " " $9 " " $13 " " $17}')
+        pci=$(echo "$dbsf" |  awk -F'[x ]' '{print $2":"$4":"$6"."$8}')
 }
 
 _finder_wrapper()
 {
-        result=""
+        local result=""
         if [ -n "$1" ]; then
                 result=$(grep -E -m 1 "$1")
         fi
@@ -43,11 +54,47 @@ _finder_wrapper()
         echo "$result"
 }
 
-### list information of virtual machine
+## match vm list
+## $1   vm's name
+## $2:  single -> match single vm
+##      default -> match multi vm
+_match_vmlist()
+{
+        # matching string end with *
+        if [[ "$1" =~ [*\*$] ]];
+        then
+                local key=${1%\*}
+                # matching string start with key
+                vmlist=$(echo "$vmlist" | grep -E "^$key")
+        else
+                if [ 0 -eq $(echo "$1" | grep -cEi "[a-zA-Z]+") ] && [ -n "$1" ]; then
+                        if [ "$2" == "single" ]; then
+                                vmlist=$(echo $vmlist | grep -E "vats-test.*-$(printf "%02d" $1)")
+                        else
+                                local arr=()
+                                for i in $(seq 1 $1);
+                                do
+                                        local tmp=$(echo "$vmlist" | grep -E "vats-test.*-$(printf "%02d" $i)")
+                                        echo $tmp
+                                        arr+=("$tmp")
+                                done
+                                vmlist=$arr
+                        fi
+                else
+                        vmlist=$(echo "$vmlist" | _finder_wrapper "$1")
+                fi
+        fi
+}
+
+# shell body
+
+## list information of virtual machine
+## $1: -v: verbose list
 _list_vm()
 {
+        local name state
         vmlist=$(virsh list --all | sed '1,2d')
-        if [ "$2" == "-v" ];
+        if [ "$1" == "-v" ];
         then
                 printf "%-60s %-10s %-20s %-10s\n" "NAME" "STATE" "IP ADDRESS" "PCI DEVICE"
         else
@@ -68,7 +115,7 @@ _list_vm()
                         state="stop"
                         ip="none"
                 fi
-                if [ "$2" == "-v" ];
+                if [ "$1" == "-v" ];
                 then
                         _get_vm_pci "$name"
                         printf "%-60s %-10s %-20s %-10s\n" "$name" "$state" "$ip" "$pci"
@@ -78,40 +125,13 @@ _list_vm()
         done <<< "$vmlist"
 }
 
-#### match vm list
-_match_vmlist()
-{
-        # matching string end with *
-        if [[ "$2" =~ [*\*$] ]];
-        then
-                local key=${2%\*}
-                # matching string start with key
-                vmlist=$(echo "$vmlist" | grep -E "^$key")
-        else
-                if [ 0 -eq $(echo "$2" | grep -cEi "[a-zA-Z]+") ] && [ -n "$2" ]; then
-                        if [ -z $(echo "$1" | grep -E "[(connect)|(console)]") ]; then
-                                vmlist=$(echo $vmlist | grep -E "vats-test.*-$(printf "%02d" $2)")
-                        else
-                                local arr=()
-                                for i in $(seq 1 $2);
-                                do
-                                        local tmp=$(echo "$vmlist" | grep -E "vats-test.*-$(printf "%02d" $i)")
-                                        echo $tmp
-                                        arr+=("$tmp")
-                                done
-                                vmlist=$arr
-                        fi
-                else
-                        vmlist=$(echo "$vmlist" | _finder_wrapper "$2")
-                fi
-        fi
-}
-
-### connect virtual machine
+## connect virtual machine
+## $1: vm's name
 _connect_vm()
 {
+        local state
         vmlist=$(virsh list --name)
-        _match_vmlist $@
+        _match_vmlist $1 "single"
         if [ -z "$vmlist" ]; then
                 echo "no matched vm"
                 return -1
@@ -132,11 +152,12 @@ _connect_vm()
         fi
 }
 
-### start virtual machine
+## start virtual machine
+## $1: vm's name
 _start_vm()
 {
         vmlist=$(virsh list --name --all)
-        _match_vmlist $@
+        _match_vmlist $1
         if [ -z "$vmlist" ];
         then
                 echo "no matched vm"
@@ -148,11 +169,12 @@ _start_vm()
         fi
 }
 
-### destroy virtual machine
+## destroy virtual machine
+## $1: vm's name
 _destroy_vm()
 {
         vmlist=$(virsh list --name)
-        _match_vmlist $@
+        _match_vmlist $1
         if [ -z "$vmlist" ];
         then
                 echo "no matched vm"
@@ -164,11 +186,13 @@ _destroy_vm()
         fi
 }
 
-### connect to vm console
+## connect to vm console
+## $1: vm's name
 _connect_vm_console()
 {
+        local state
         vmlist=$(virsh list --name)
-        _match_vmlist $@
+        _match_vmlist $1 "single"
         if [ -z "$vmlist" ];
         then
                 echo "no matched vm"
@@ -190,12 +214,13 @@ _connect_vm_console()
         fi
 }
 
-### change attached vf device
+## change attached vf device
+## $1: vm's name
+## $2: pci dbsf
 _change_dev()
 {
-
         vmlist=$(virsh list --name --all)
-        _match_vmlist $@
+        _match_vmlist $1 "single"
         if [ -z "$vmlist" ];
         then
                 echo "no matched vm"
@@ -205,7 +230,7 @@ _change_dev()
         echo current device attached to $vmlist: $pci
 
         virt-xml $vmlist --remove-device --host-dev all
-        pci=$(lspci -D| grep ATI | grep Display | _finder_wrapper "$3")
+        pci=$(lspci -D| grep ATI | grep Display | _finder_wrapper "$2")
         if [ -n "$pci" ]; then
                 virt-xml $vmlist --add-device --host-dev $(echo $pci | awk -F " " '{print $1}')
         else
@@ -216,24 +241,34 @@ _change_dev()
 ## vmc: virtual machine controller
 case $1 in
 "list")
+        shift
         _list_vm $@
         ;;
 "start")
+        shift
         _start_vm $@
         ;;
 "connect")
+        shift
         _connect_vm $@
         ;;
 "destroy")
+        shift
         _destroy_vm $@
         ;;
 "console")
+        shift
         _connect_vm_console $@
         ;;
 "change-dev")
+        shift
         _change_dev $@
         ;;
 *)
         echo command undefined!
 esac
 
+# clean and reset option
+
+## restore wildcard expansion
+set +o noglob
