@@ -81,7 +81,11 @@ _match_vmlist()
                                 vmlist=$arr
                         fi
                 else
-                        vmlist=$(echo "$vmlist" | _finder_wrapper "$1")
+                        if [ "single" == "$1" ]; then
+                                vmlist=$(echo "$vmlist" | _finder_wrapper "")
+                        else
+                                vmlist=$(echo "$vmlist" | _finder_wrapper "$1")
+                        fi
                 fi
         fi
 }
