@@ -3,10 +3,10 @@
 # Prerequisite
 
 ## check fzf
-if which fzf | grep -q not; then
-        export FZF_EXIST=1
-else
+if which fzf | grep -q "not"; then
         export FZF_EXIST=0
+else
+        export FZF_EXIST=1
 fi
 
 ## prevent wildcard expansion
