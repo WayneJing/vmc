@@ -3,7 +3,7 @@
 # Prerequisite
 
 ## check fzf
-if [ -z "$(which fzf | grep not)" ]; then
+if which fzf | grep -q not; then
         export FZF_EXIST=1
 else
         export FZF_EXIST=0
@@ -24,7 +24,7 @@ set -o noglob
 ## $1: vm's name
 _get_vm_ip ()
 {
-        ip=$(virsh domifaddr $1 | sed '1,2d' | awk '{print $4}')
+        ip=$(virsh domifaddr "$1" | sed '1,2d' | awk '{print $4}')
         ip=${ip%/*}
 }
 
@@ -33,7 +33,7 @@ _get_vm_ip ()
 _get_vm_pci ()
 {
         local xml dbsf
-        xml=$(virsh dumpxml $1 | xmllint --xpath "//domain/devices/hostdev/source/address" -)
+        xml=$(virsh dumpxml "$1" | xmllint --xpath "//domain/devices/hostdev/source/address" -)
         if [ -z "$xml" ]; then
                 pci=""
                 return 0
@@ -67,18 +67,18 @@ _match_vmlist()
                 # matching string start with key
                 vmlist=$(echo "$vmlist" | grep -E "^$key")
         else
-                if [ 0 -eq $(echo "$1" | grep -cEi "[a-zA-Z]+") ] && [ -n "$1" ]; then
+                if [ 0 -eq "$(echo "$1" | grep -cEi "[a-zA-Z]+")" ] && [ -n "$1" ]; then
                         if [ "$2" == "single" ]; then
-                                vmlist=$(echo $vmlist | grep -E "vats-test.*-$(printf "%02d" $1)")
+                                vmlist=$(echo "$vmlist" | grep -E "vats-test.*-$(printf "%02d" "$1")")
                         else
                                 local arr=()
-                                for i in $(seq 1 $1);
+                                for i in $(seq 1 "$1");
                                 do
-                                        local tmp=$(echo "$vmlist" | grep -E "vats-test.*-$(printf "%02d" $i)")
-                                        echo $tmp
+                                        local tmp=$(echo "$vmlist" | grep -E "vats-test.*-$(printf "%02d" "$i")")
+                                        echo "$tmp"
                                         arr+=("$tmp")
                                 done
-                                vmlist=$arr
+                                vmlist=${arr[*]}
                         fi
                 else
                         if [ "single" == "$1" ]; then
@@ -102,7 +102,7 @@ _list_vm()
         then
                 printf "%-60s %-10s %-20s %-10s\n" "NAME" "STATE" "IP ADDRESS" "PCI DEVICE"
         else
-                printf "%-60s %-10s %-20s %-10s\n" "NAME" "STATE" "IP ADDRESS"
+                printf "%-60s %-10s %-20s\n" "NAME" "STATE" "IP ADDRESS"
         fi
         printf "============================================================================================\n"
         while read -r vminfo; do
@@ -112,7 +112,7 @@ _list_vm()
                 then
                         state="running"
                         _get_vm_ip "$name"
-                        if [ ! -n "$ip" ];
+                        if [ -z "$ip" ];
                         then ip="none"
                         fi
                 else
@@ -124,7 +124,7 @@ _list_vm()
                         _get_vm_pci "$name"
                         printf "%-60s %-10s %-20s %-10s\n" "$name" "$state" "$ip" "$pci"
                 else
-                        printf "%-60s %-10s %-20s %-10s\n" "$name" "$state" "$ip"
+                        printf "%-60s %-10s %-20s\n" "$name" "$state" "$ip"
                 fi
         done <<< "$vmlist"
 }
@@ -135,22 +135,22 @@ _connect_vm()
 {
         local state
         vmlist=$(virsh list --name)
-        _match_vmlist $1 "single"
+        _match_vmlist "$1" "single"
         if [ -z "$vmlist" ]; then
                 echo "no matched vm"
-                return -1
+                return 1
         fi
-        state=$(virsh domstate $vmlist)
+        state=$(virsh domstate "$vmlist")
         if [ "$state" == "running" ];
         then
                 ip=""
-                while [ ! -n "$ip" ]
+                while [ -z "$ip" ]
                 do
                         sleep 1
-                        _get_vm_ip $vmlist
+                        _get_vm_ip "$vmlist"
                 done
-                until nc -vzw 2 $ip 22; do sleep 2; done
-                sshpass -p amd1234 ssh -o StrictHostKeyChecking=no root@$ip
+                until nc -vzw 2 "$ip" 22; do sleep 2; done
+                sshpass -p amd1234 ssh -o StrictHostKeyChecking=no root@"$ip"
         else
                 echo "VM is not running"
         fi
@@ -161,14 +161,14 @@ _connect_vm()
 _start_vm()
 {
         vmlist=$(virsh list --name --all)
-        _match_vmlist $1
+        _match_vmlist "$1"
         if [ -z "$vmlist" ];
         then
                 echo "no matched vm"
         else
                 while read -r vm; do
                         echo "starting $vm"
-                        virsh start $vm
+                        virsh start "$vm"
                 done <<< "$vmlist"
         fi
 }
@@ -178,14 +178,14 @@ _start_vm()
 _destroy_vm()
 {
         vmlist=$(virsh list --name)
-        _match_vmlist $1
+        _match_vmlist "$1"
         if [ -z "$vmlist" ];
         then
                 echo "no matched vm"
         else
                 while read -r vm; do
                         echo "destroying $vm"
-                        virsh destroy $vm
+                        virsh destroy "$vm"
                 done <<< "$vmlist"
         fi
 }
@@ -196,23 +196,23 @@ _connect_vm_console()
 {
         local state
         vmlist=$(virsh list --name)
-        _match_vmlist $1 "single"
+        _match_vmlist "$1" "single"
         if [ -z "$vmlist" ];
         then
                 echo "no matched vm"
-                return -1
+                return 1
         fi
-        state=$(virsh domstate $vmlist)
+        state=$(virsh domstate "$vmlist")
         if [ "$state" == "running" ];
         then
                 ip=""
-                while [ ! -n "$ip" ]
+                while [ -z "$ip" ]
                 do
                         sleep 1
-                        _get_vm_ip $vmlist
+                        _get_vm_ip "$vmlist"
                 done
-                until nc -vzw 2 $ip 22; do sleep 2; done
-                virsh console $vmlist --force
+                until nc -vzw 2 "$ip" 22; do sleep 2; done
+                virsh console "$vmlist" --force
         else
                 echo "VM is not running"
         fi
@@ -224,19 +224,19 @@ _connect_vm_console()
 _change_dev()
 {
         vmlist=$(virsh list --name --all)
-        _match_vmlist $1 "single"
+        _match_vmlist "$1" "single"
         if [ -z "$vmlist" ];
         then
                 echo "no matched vm"
-                return -1
+                return 1
         fi
         _get_vm_pci "$vmlist"
-        echo current device attached to $vmlist: $pci
+        echo current device attached to "$vmlist": "$pci"
 
-        virt-xml $vmlist --remove-device --host-dev all
+        virt-xml "$vmlist" --remove-device --host-dev all
         pci=$(lspci -D| grep ATI | grep Display | _finder_wrapper "$2")
         if [ -n "$pci" ]; then
-                virt-xml $vmlist --add-device --host-dev $(echo $pci | awk -F " " '{print $1}')
+                virt-xml "$vmlist" --add-device --host-dev "$(echo "$pci" | awk -F " " '{print $1}')"
         else
                 echo no pci-device attached
         fi
@@ -336,35 +336,35 @@ _help()
         esac
 }
 ## vmc: virtual machine controller
-if [ "${@: -1}" == "--help" ] || [ "${@: -1}" == "-h" ]; then
-        _help $@
+if [ "${*: -1}" == "--help" ] || [ "${*: -1}" == "-h" ]; then
+        _help "$@"
         exit 0
 fi
 
 case $1 in
 "list")
         shift
-        _list_vm $@
+        _list_vm "$@"
         ;;
 "start")
         shift
-        _start_vm $@
+        _start_vm "$@"
         ;;
 "connect")
         shift
-        _connect_vm $@
+        _connect_vm "$@"
         ;;
 "destroy")
         shift
-        _destroy_vm $@
+        _destroy_vm "$@"
         ;;
 "console")
         shift
-        _connect_vm_console $@
+        _connect_vm_console "$@"
         ;;
 "change-dev")
         shift
-        _change_dev $@
+        _change_dev "$@"
         ;;
 *)
         echo "command undefined! Please use vmc --help"
