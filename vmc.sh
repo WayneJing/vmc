@@ -78,7 +78,10 @@ _match_vmlist()
                                         echo "$tmp"
                                         arr+=("$tmp")
                                 done
-                                vmlist=${arr[*]}
+                                oldIFS=$IFS
+                                IFS=$(echo -e "\n\r")
+                                vmlist="${arr[*]}"
+                                IFS=$oldIFS
                         fi
                 else
                         if [ "single" == "$1" ]; then
