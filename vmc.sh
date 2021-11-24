@@ -42,14 +42,25 @@ _get_vm_pci ()
         pci=$(echo "$dbsf" |  awk -F'[x ]' '{print $2":"$4":"$6"."$8}')
 }
 
+## wrap the fuzzy find and grep, used only when matching single result
+## $1: string to find from
+## $2: string to match
 _finder_wrapper()
 {
+        local results=""
         local result=""
-        if [ -n "$1" ]; then
-                result=$(grep -E -m 1 "$1")
+        if [ -n "$2" ]; then
+                results=$(echo "$1" | grep -E  "$2")
+                if [ 1 -eq $(echo "$results" | wc -l) ]; then
+                        result=$results
+                else
+                        select result in $results; do
+                                break
+                        done
+                fi
         fi
         if [ -z "$result" ] && [ 1 -eq $FZF_EXIST ]; then
-                result=$(fzf -q "$1")
+                result=$(echo "$1" | fzf -q "$2")
         fi
         echo "$result"
 }
@@ -85,9 +96,9 @@ _match_vmlist()
                         fi
                 else
                         if [ "single" == "$1" ]; then
-                                vmlist=$(echo "$vmlist" | _finder_wrapper "")
+                                vmlist=$(_finder_wrapper  "$vmlist" "")
                         else
-                                vmlist=$(echo "$vmlist" | _finder_wrapper "$1")
+                                vmlist=$(_finder_wrapper  "$vmlist" "$1")
                         fi
                 fi
         fi
@@ -237,7 +248,7 @@ _change_dev()
         echo current device attached to "$vmlist": "$pci"
 
         virt-xml "$vmlist" --remove-device --host-dev all
-        pci=$(lspci -D| grep ATI | grep Display | _finder_wrapper "$2")
+        pci=$( _finder_wrapper  "$(lspci -D| grep ATI | grep Display)" "$2")
         if [ -n "$pci" ]; then
                 virt-xml "$vmlist" --add-device --host-dev "$(echo "$pci" | awk -F " " '{print $1}')"
         else
