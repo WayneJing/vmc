@@ -3,10 +3,10 @@
 # Prerequisite
 
 ## check fzf
-if which fzf | grep -q "not"; then
-        export FZF_EXIST=0
+if which fzf ; then
+        FZF_EXIST=1
 else
-        export FZF_EXIST=1
+        FZF_EXIST=0
 fi
 
 ## prevent wildcard expansion
@@ -49,7 +49,9 @@ _finder_wrapper()
 {
         local results=""
         local result=""
-        if [ -n "$2" ]; then
+        if [ 1 -eq $FZF_EXIST ]; then
+                result=$(echo "$1" | fzf -q "$2")
+        elif [ -n "$2" ]; then
                 results=$(echo "$1" | grep -E  "$2")
                 if [ 1 -eq $(echo "$results" | wc -l) ]; then
                         result=$results
@@ -58,9 +60,6 @@ _finder_wrapper()
                                 break
                         done
                 fi
-        fi
-        if [ -z "$result" ] && [ 1 -eq $FZF_EXIST ]; then
-                result=$(echo "$1" | fzf -q "$2")
         fi
         echo "$result"
 }
