@@ -17,6 +17,7 @@ set -o noglob
 # glbal variable
 # ip: vm's ip address
 # pci: vm's pci device
+# hda: vm's qcow2 image path
 # vmlist: current vm's list
 
 # library
@@ -41,6 +42,21 @@ _get_vm_pci ()
         fi
         dbsf=$(echo "$xml" |  awk -F'[=/< "]' '{print $5 " " $9 " " $13 " " $17}')
         pci=$(echo "$dbsf" |  awk -F'[x ]' '{print $2":"$4":"$6"."$8}')
+}
+
+## get vm qcow2 image path from vm's name
+## $1: vm's name
+_get_vm_hda ()
+{
+        hda=$(virsh domblklist "$1" | grep hda | awk '{print $2}')
+        if [ -z "$hda" ]; then
+                hda=""
+                return 0
+        fi
+        if [ ! -f "$hda" ]; then
+                hda=""
+                return 0
+        fi
 }
 
 ## wrap the fuzzy find and grep, used only when matching single result
@@ -102,6 +118,8 @@ _match_vmlist()
                 else
                         if [ "1" == "$#" ] && [ "single" == "$1" ]; then
                                 vmlist=$(_finder_wrapper  "$vmlist" "")
+                        elif [ "${*: -1}" == "--no-fzf" ]; then
+                                vmlist=$(_finder_wrapper  "$vmlist" "$1" "--no-fzf")
                         else
                                 vmlist=$(_finder_wrapper  "$vmlist" "$1")
                         fi
@@ -261,6 +279,70 @@ _change_dev()
         fi
 }
 
+## clone vm from base vm
+## $1: base vm's name
+## $2: child vm's name
+_clone_vm()
+{
+        local backing_file hda_dir
+        if [ $# != 2 ];
+        then
+                echo "Please give name of base vm and child vm"
+                return 1
+        fi
+        vmlist=$(virsh list --name --all)
+        _match_vmlist "$1" "single"
+        if [ -z "$vmlist" ];
+        then
+                echo "no matched vm"
+                return 1
+        fi
+        _get_vm_hda "$vmlist"
+        if [ ! -f "$hda" ];
+        then
+                echo "Error path of hda"
+                return 1
+        fi
+        #echo "$hda"
+        backing_file=$(qemu-img info "$hda" | grep "backing file:" | awk '{print $3}')
+        #echo "$backing_file"
+        if [[ -n "$backing_file" ]];
+        then
+                echo "$vmlist is a child vm, do not support clone"
+                return 1
+        fi
+        echo "clone VM from $vmlist to $2"
+        hda_dir=$(dirname "$hda")
+        qemu-img create -f qcow2 -F qcow2 -b "$hda" "$hda_dir/$2.qcow2"
+        virt-clone --original "$vmlist" --name "$2" --file "$hda_dir/$2.qcow2" --preserve-data
+        return 0
+}
+
+## delete vm
+## $1: vm's name
+_delete_vm()
+{
+        if [ "$2" == "-a" ];
+        then
+                vmlist=$(virsh list --name --all)
+                _match_vmlist "$1" "single"
+                if [ -z "$vmlist" ];
+                then
+                        echo "no matched vm"
+                        return 1
+                fi
+                _get_vm_hda "$vmlist"
+                if [ ! -f "$hda" ];
+                then
+                        echo "Error path of hda"
+                        return 1
+                fi
+                echo "Delete $hda"
+                rm "$hda"
+        fi
+        virsh undefine "$1"
+}
+
 _help()
 {
         case $1 in
@@ -275,6 +357,8 @@ _help()
                 printf "%-20s %-60s\n" "destroy" "destroy one/multi virtual machines according to pattern"
                 printf "%-20s %-60s\n" "console" "connect one virtual machine via console according to pattern"
                 printf "%-20s %-60s\n" "change-dev" "change the vf attached to the virtual machine"
+                printf "%-20s %-60s\n" "clone" "clone a child virtual machine from the base virtual machine"
+                printf "%-20s %-60s\n" "delete" "delete(undefine) a virtual machine"
                 printf "%-20s %-60s\n" "--help" "show this help document"
                 echo ""
                 echo "use vmc <command> --help to get detailed help"
@@ -349,6 +433,24 @@ _help()
                 echo "if fzf is installed"
                 echo "vmc change-dev                                   call fzf to interactively find which vm to change and which device to attach"
                 ;;
+        "clone")
+                echo "NAME"
+                echo "vmc clone - clone a child virtual machine from the base virtual machine"
+                echo ""
+                echo "SYNOPSIS"
+                echo "vmc clone <base_domain_name> <child_domain_name>           clone a child VM from the base VM"
+                echo ""
+                ;;
+        "delete")
+                echo "NAME"
+                echo "vmc delete - delete(undefine) a virtual machine"
+                echo ""
+                echo "SYNOPSIS"
+                echo "vmc delete <domain_name>           delete(undefine) a VM"
+                echo ""
+                echo "OPTION"
+                printf "%-20s %-60s\n" "-a" "delete virtual machine's qcow2 image"
+                ;;
         *)
                 echo "command undefined! Please use vmc --help"
                 ;;
@@ -384,6 +486,14 @@ case $1 in
 "change-dev")
         shift
         _change_dev "$@"
+        ;;
+"clone")
+        shift
+        _clone_vm "$@"
+        ;;
+"delete")
+        shift
+        _delete_vm "$@"
         ;;
 *)
         echo "command undefined! Please use vmc --help"
