@@ -4,7 +4,7 @@ _vmc()
 {
         if [[ "${COMP_CWORD}" == "1" ]];
         then
-                COMPREPLY=( $( compgen -W "list start connect destroy console change-dev" -- ${COMP_WORDS[${COMP_CWORD}]}))
+                COMPREPLY=( $( compgen -W "list start connect destroy console change-dev clone delete" -- ${COMP_WORDS[${COMP_CWORD}]}))
         elif [[ "${COMP_CWORD}" == "2" ]]; then
                 local word=${COMP_WORDS[1]}
                 local vmlist
@@ -22,6 +22,12 @@ _vmc()
                         vmlist=$(virsh list --name)
                         ;;
                 change-dev)
+                        vmlist=$(virsh list --name --all)
+                        ;;
+                clone)
+                        vmlist=$(virsh list --name --all)
+                        ;;
+                delete)
                         vmlist=$(virsh list --name --all)
                         ;;
                 esac

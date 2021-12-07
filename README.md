@@ -123,7 +123,12 @@ vmc change-dev <domain_name> <pci_bdf> # will remove all vf device attached to t
 vmc change-dev # will call fzf to interactively find vm and attached pci device
 ```
 
+### Clone
 
+```sh
+# clone a child VM from the base VM
+vmc clone <base_domain_name> <child_domain_name>
+```
 
 ***All command parameters support bash completion***
 
