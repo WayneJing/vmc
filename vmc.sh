@@ -3,7 +3,8 @@
 # Prerequisite
 
 ## check fzf
-if which fzf ; then
+fzf_path=$(which fzf)
+if [ -n "$fzf_path" ]; then
         FZF_EXIST=1
 else
         FZF_EXIST=0
@@ -45,12 +46,17 @@ _get_vm_pci ()
 ## wrap the fuzzy find and grep, used only when matching single result
 ## $1: string to find from
 ## $2: string to match
+## $3: disable fzf
 _finder_wrapper()
 {
         local results=""
         local result=""
-        if [ 1 -eq $FZF_EXIST ]; then
-                result=$(echo "$1" | fzf -q "$2")
+        if [ 1 -eq $FZF_EXIST ] &&  [ "${*: -1}" != "--no-fzf" ]; then
+                if [ -n "$2" ]; then
+                        result=$(echo "$1" | fzf -q "$2" -1)
+                else
+                        result=$(echo "$1" | fzf -q "" )
+                fi
         elif [ -n "$2" ]; then
                 results=$(echo "$1" | grep -E  "$2")
                 if [ 1 -eq $(echo "$results" | wc -l) ]; then
@@ -94,7 +100,7 @@ _match_vmlist()
                                 IFS=$oldIFS
                         fi
                 else
-                        if [ "single" == "$1" ]; then
+                        if [ "1" == "$#" ] && [ "single" == "$1" ]; then
                                 vmlist=$(_finder_wrapper  "$vmlist" "")
                         else
                                 vmlist=$(_finder_wrapper  "$vmlist" "$1")
