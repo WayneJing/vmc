@@ -3,13 +3,15 @@
 # Prerequisite
 
 ## check fzf
-fzf_path=$(which fzf)
-if [ -n "$fzf_path" ]; then
-        FZF_EXIST=1
-else
-        FZF_EXIST=0
-fi
-
+declare -A args=(
+        [command]=""
+        [vm_pattern]=""
+        [dest_vm]=""
+        [pci_dev]=""
+        [all]=0
+        [verbose]=0
+        [confirm]=0
+)
 ## prevent wildcard expansion
 set -o noglob
 
@@ -67,13 +69,7 @@ _finder_wrapper()
 {
         local results=""
         local result=""
-        if [ 1 -eq $FZF_EXIST ] &&  [ "${*: -1}" != "--no-fzf" ]; then
-                if [ -n "$2" ]; then
-                        result=$(echo "$1" | fzf -q "$2" -1)
-                else
-                        result=$(echo "$1" | fzf -q "" )
-                fi
-        elif [ -n "$2" ]; then
+        if [ -n "$2" ]; then
                 results=$(echo "$1" | grep -E  "$2")
                 if [ 1 -eq $(echo "$results" | wc -l) ]; then
                         result=$results
@@ -116,13 +112,7 @@ _match_vmlist()
                                 IFS=$oldIFS
                         fi
                 else
-                        if [ "1" == "$#" ] && [ "single" == "$1" ]; then
-                                vmlist=$(_finder_wrapper  "$vmlist" "")
-                        elif [ "${*: -1}" == "--no-fzf" ]; then
-                                vmlist=$(_finder_wrapper  "$vmlist" "$1" "--no-fzf")
-                        else
-                                vmlist=$(_finder_wrapper  "$vmlist" "$1")
-                        fi
+                        vmlist=$(_finder_wrapper  "$vmlist" "$1")
                 fi
         fi
 }
@@ -385,8 +375,6 @@ _help()
                 echo "vmc start <num>                   automatically start the VM that matches vats-test.*-xx"
                 echo "vmc start <pattern>               automatically start the VM that starts with the pattern"
                 echo ""
-                echo "if fzf is installed"
-                echo "vmc start                         call fzf to interactively find which vm to start"
                 ;;
         "destroy")
                 echo "NAME"
@@ -397,8 +385,6 @@ _help()
                 echo "vmc destroy <num>                   automatically destroy the VM that matches vats-test.*-xx"
                 echo "vmc destroy <pattern>               automatically destroy the VM that destroys with the pattern"
                 echo ""
-                echo "if fzf is installed"
-                echo "vmc destroy                         call fzf to interactively find which vm to destroy"
                 ;;
         "connect")
                 echo "NAME"
@@ -408,8 +394,6 @@ _help()
                 echo "vmc connect <domain_name>           connect to the specific vm via ssh"
                 echo "vmc connect <num>                   automatically connect the VM that matches vats-test.*-xx"
                 echo ""
-                echo "if fzf is installed"
-                echo "vmc connect                         call fzf to interactively find which vm to connect"
                 ;;
         "console")
                 echo "NAME"
@@ -419,8 +403,6 @@ _help()
                 echo "vmc console <domain_name>           connect to the specific vm via console"
                 echo "vmc console <num>                   automatically connect the VM that matches vats-test.*-xx"
                 echo ""
-                echo "if fzf is installed"
-                echo "vmc console                         call fzf to interactively find which vm to connect"
                 ;;
         "change-dev")
                 echo "NAME"
@@ -430,8 +412,6 @@ _help()
                 echo "vmc change-dev <domain_name> <pci_bdf>           change the specific vm to attach the specific device"
                 echo "vmc change-dev <num> <pci_bdf>                   change the VM that matches vats-test.*-xx"
                 echo ""
-                echo "if fzf is installed"
-                echo "vmc change-dev                                   call fzf to interactively find which vm to change and which device to attach"
                 ;;
         "clone")
                 echo "NAME"
@@ -464,34 +444,42 @@ fi
 
 case $1 in
 "list")
+        args[command]="$1"
         shift
         _list_vm "$@"
         ;;
 "start")
+        args[command]="$1"
         shift
         _start_vm "$@"
         ;;
 "connect")
+        args[command]="$1"
         shift
         _connect_vm "$@"
         ;;
 "destroy")
+        args[command]="$1"
         shift
         _destroy_vm "$@"
         ;;
 "console")
+        args[command]="$1"
         shift
         _connect_vm_console "$@"
         ;;
 "change-dev")
+        args[command]="$1"
         shift
         _change_dev "$@"
         ;;
 "clone")
+        args[command]="$1"
         shift
         _clone_vm "$@"
         ;;
 "delete")
+        args[command]="$1"
         shift
         _delete_vm "$@"
         ;;
