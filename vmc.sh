@@ -343,6 +343,23 @@ _delete_vm()
         virsh undefine "$1"
 }
 
+## reset virtual machine
+## $1: vm's name
+_reset_vm()
+{
+        vmlist=$(virsh list --name)
+        _match_vmlist "$1"
+        if [ -z "$vmlist" ];
+        then
+                echo "no matched vm"
+        else
+                while read -r vm; do
+                        echo "reseting $vm"
+                        virsh reset "$vm"
+                done <<< "$vmlist"
+        fi
+}
+
 _help()
 {
         case $1 in
@@ -451,6 +468,18 @@ _help()
                 echo "OPTION"
                 printf "%-20s %-60s\n" "-a" "delete virtual machine's qcow2 image"
                 ;;
+        "reset")
+                echo "NAME"
+                echo "vmc reset - reset one/multi virtual machines according to pattern"
+                echo ""
+                echo "SYNOPSIS"
+                echo "vmc reset <domain_name>           automatically reset the VM"
+                echo "vmc reset <num>                   automatically reset the VM that matches vats-test.*-xx"
+                echo "vmc reset <pattern>               automatically reset the VM that resets with the pattern"
+                echo ""
+                echo "if fzf is installed"
+                echo "vmc reset                         call fzf to interactively find which vm to reset"
+                ;;
         *)
                 echo "command undefined! Please use vmc --help"
                 ;;
@@ -494,6 +523,10 @@ case $1 in
 "delete")
         shift
         _delete_vm "$@"
+        ;;
+"reset")
+        shift
+        _reset_vm "$@"
         ;;
 *)
         echo "command undefined! Please use vmc --help"
