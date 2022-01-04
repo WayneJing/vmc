@@ -130,5 +130,16 @@ vmc change-dev # will call fzf to interactively find vm and attached pci device
 vmc clone <base_domain_name> <child_domain_name>
 ```
 
+
+### Reset VMs
+
+```sh
+vmc reset <domain_name>
+vmc reset <num> #will automatically reset the VM that matches vats-test.*-xx
+vmc reset <pattern> #will automatically reset the VM that starts with the pattern
+#if fzf is installed
+vmc reset #will call fzf to interactively find which vm to reset
+```
+
 ***All command parameters support bash completion***
 
