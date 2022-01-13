@@ -7,7 +7,7 @@
 - [ ] beautiful print for vmc list
 - [x] attach/detach vf by virt-xml
 - [ ] attach/detach disk by virt-xml
-- [ ] create vm by virt-clone
+- [x] create vm by virt-clone
 
 ## Guides
 
@@ -15,8 +15,6 @@
 
 -   xmllint: xml parsing tool
 -   libguestfs-tools: guest image manage tool
--   fzf(optional): fuzzy finder
-
 
 
 ### List VMs
@@ -75,9 +73,6 @@ vats-test-ubuntu2004-clean-mainline-promotion-04             stop       none    
 vmc start <domain_name>
 vmc start <num> #will automatically start the VM that matches vats-test.*-xx
 vmc start <pattern> #will automatically start the VM that starts with the pattern
-#if fzf is installed
-vmc start #will call fzf to interactively find which vm to start
-```
 
 
 
@@ -87,8 +82,6 @@ vmc start #will call fzf to interactively find which vm to start
 vmc destroy <domain_name>
 vmc destroy <num> #will automatically destroy the VM that matches vats-test.*-xx
 vmc destroy <pattern> #will automatically destroy the VM that starts with the pattern
-#if fzf is installed
-vmc destroy #will call fzf to interactively find which vm to destroy
 ```
 
 
@@ -98,8 +91,6 @@ vmc destroy #will call fzf to interactively find which vm to destroy
 ```sh
 vmc connect <domain_name> #will connect to the specific vm via ssh
 vmc connect <num> #will automatically connect the VM that matches vats-test.*-xx
-#if fzf is installed
-vmc connect # will call fzf to interactively find which vm to connect
 ```
 
 
@@ -109,8 +100,6 @@ vmc connect # will call fzf to interactively find which vm to connect
 ```sh
 vmc console <domain_name> #will connect to the specific vm console via ssh
 vmc console <num> #will automatically connect the VM console that matches vats-test.*-xx
-#if fzf is installed
-vmc console # will call fzf to interactively find which vm to connect console
 ```
 
 
@@ -119,9 +108,6 @@ vmc console # will call fzf to interactively find which vm to connect console
 
 ```sh
 vmc change-dev <domain_name> <pci_bdf> # will remove all vf device attached to the vm and attach the specified device
-#if fzf is installed
-vmc change-dev # will call fzf to interactively find vm and attached pci device
-```
 
 ### Clone
 
@@ -137,8 +123,6 @@ vmc clone <base_domain_name> <child_domain_name>
 vmc reset <domain_name>
 vmc reset <num> #will automatically reset the VM that matches vats-test.*-xx
 vmc reset <pattern> #will automatically reset the VM that starts with the pattern
-#if fzf is installed
-vmc reset #will call fzf to interactively find which vm to reset
 ```
 
 ***All command parameters support bash completion***

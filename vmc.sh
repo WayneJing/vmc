@@ -2,16 +2,6 @@
 
 # Prerequisite
 
-## check fzf
-declare -A args=(
-        [command]=""
-        [vm_pattern]=""
-        [dest_vm]=""
-        [pci_dev]=""
-        [all]=0
-        [verbose]=0
-        [confirm]=0
-)
 ## prevent wildcard expansion
 set -o noglob
 
@@ -456,9 +446,6 @@ _help()
                 echo "vmc reset <domain_name>           automatically reset the VM"
                 echo "vmc reset <num>                   automatically reset the VM that matches vats-test.*-xx"
                 echo "vmc reset <pattern>               automatically reset the VM that resets with the pattern"
-                echo ""
-                echo "if fzf is installed"
-                echo "vmc reset                         call fzf to interactively find which vm to reset"
                 ;;
         *)
                 echo "command undefined! Please use vmc --help"
@@ -473,42 +460,34 @@ fi
 
 case $1 in
 "list")
-        args[command]="$1"
         shift
         _list_vm "$@"
         ;;
 "start")
-        args[command]="$1"
         shift
         _start_vm "$@"
         ;;
 "connect")
-        args[command]="$1"
         shift
         _connect_vm "$@"
         ;;
 "destroy")
-        args[command]="$1"
         shift
         _destroy_vm "$@"
         ;;
 "console")
-        args[command]="$1"
         shift
         _connect_vm_console "$@"
         ;;
 "change-dev")
-        args[command]="$1"
         shift
         _change_dev "$@"
         ;;
 "clone")
-        args[command]="$1"
         shift
         _clone_vm "$@"
         ;;
 "delete")
-        args[command]="$1"
         shift
         _delete_vm "$@"
         ;;
