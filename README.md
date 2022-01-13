@@ -73,7 +73,7 @@ vats-test-ubuntu2004-clean-mainline-promotion-04             stop       none    
 vmc start <domain_name>
 vmc start <num> #will automatically start the VM that matches vats-test.*-xx
 vmc start <pattern> #will automatically start the VM that starts with the pattern
-
+```
 
 
 ### Destroy VMs
@@ -108,6 +108,7 @@ vmc console <num> #will automatically connect the VM console that matches vats-t
 
 ```sh
 vmc change-dev <domain_name> <pci_bdf> # will remove all vf device attached to the vm and attach the specified device
+```
 
 ### Clone
 
