@@ -10,6 +10,7 @@ set -o noglob
 # ip: vm's ip address
 # pci: vm's pci device
 # hda: vm's qcow2 image path
+# vcpu: vm's vcpu count
 # vmlist: current vm's list
 
 # library
@@ -49,6 +50,14 @@ _get_vm_hda ()
                 hda=""
                 return 0
         fi
+}
+
+## get vm vcpu from vm's name
+## $1: vm's name
+_get_vm_vcpu ()
+{
+        local xml dbsf
+        vcpu=$(virsh vcpucount "$1" | grep "current" | grep "config" | awk '{print $3}')
 }
 
 ## wrap the fuzzy find and grep, used only when matching single result
@@ -117,11 +126,11 @@ _list_vm()
         vmlist=$(virsh list --all | sed '1,2d')
         if [ "$1" == "-v" ];
         then
-                printf "%-60s %-10s %-20s %-10s\n" "NAME" "STATE" "IP ADDRESS" "PCI DEVICE"
+                printf "%-60s %-10s %-20s %-15s %-4s\n" "NAME" "STATE" "IP ADDRESS" "PCI DEVICE" "VCPU_NUM"
         else
                 printf "%-60s %-10s %-20s\n" "NAME" "STATE" "IP ADDRESS"
         fi
-        printf "============================================================================================\n"
+        printf "==============================================================================================================\n"
         while read -r vminfo; do
                 name=$(echo "$vminfo" | awk '{print $2}')
                 state=$(echo "$vminfo" | awk '{print $3}')
@@ -139,7 +148,8 @@ _list_vm()
                 if [ "$1" == "-v" ];
                 then
                         _get_vm_pci "$name"
-                        printf "%-60s %-10s %-20s %-10s\n" "$name" "$state" "$ip" "$pci"
+                        _get_vm_vcpu "$name"
+                        printf "%-60s %-10s %-20s %-15s %-4s\n" "$name" "$state" "$ip" "$pci" "$vcpu"
                 else
                         printf "%-60s %-10s %-20s\n" "$name" "$state" "$ip"
                 fi
@@ -259,6 +269,22 @@ _change_dev()
         fi
 }
 
+## change attached vcpu number
+## $1: vm's name
+## $2: vcpu number
+_change_vcpu()
+{
+        vmlist=$(virsh list --name --all)
+        _match_vmlist "$1" "single"
+        if [ -z "$vmlist" ];
+        then
+                echo "no matched vm"
+                return 1
+        fi
+        virt-xml "$vmlist" --edit --vcpus "$2"
+        echo "$vmlist vcpu changed to $2"
+}
+
 ## clone vm from base vm
 ## $1: base vm's name
 ## $2: child vm's name
@@ -294,6 +320,50 @@ _clone_vm()
         echo "clone VM from $vmlist to $2"
         hda_dir=$(dirname "$hda")
         qemu-img create -f qcow2 -F qcow2 -b "$hda" "$hda_dir/$2.qcow2"
+        virt-clone --original "$vmlist" --name "$2" --file "$hda_dir/$2.qcow2" --preserve-data
+        return 0
+}
+
+## copy vm from child vm
+## $1: old child vm's name
+## $2: new child vm's name
+_copy_vm()
+{
+        local backing_file hda_dir
+        if [ $# != 2 ];
+        then
+                echo "Please give name of old child vm and new child vm"
+                return 1
+        fi
+        vmlist=$(virsh list --name --all)
+        _match_vmlist "$1" "single"
+        if [ -z "$vmlist" ];
+        then
+                echo "no matched vm"
+                return 1
+        fi
+        if [ "$vmlist" == "$2" ];
+        then
+                echo "Same name for child and parent VM!"
+                return 1
+        fi
+        _get_vm_hda "$vmlist"
+        if [ ! -f "$hda" ];
+        then
+                echo "Error path of hda"
+                return 1
+        fi
+        #echo "$hda"
+        backing_file=$(qemu-img info "$hda" | grep "backing file:" | awk '{print $3}')
+        #echo "$backing_file"
+        if [[ -z "$backing_file" ]];
+        then
+                echo "$vmlist is a base vm, do not support copy"
+                return 1
+        fi
+        echo "copy VM from $vmlist to $2"
+        hda_dir=$(dirname "$hda")
+        cp "$hda" "$hda_dir/$2.qcow2"
         virt-clone --original "$vmlist" --name "$2" --file "$hda_dir/$2.qcow2" --preserve-data
         return 0
 }
@@ -354,8 +424,11 @@ _help()
                 printf "%-20s %-60s\n" "destroy" "destroy one/multi virtual machines according to pattern"
                 printf "%-20s %-60s\n" "console" "connect one virtual machine via console according to pattern"
                 printf "%-20s %-60s\n" "change-dev" "change the vf attached to the virtual machine"
+                printf "%-20s %-60s\n" "change-vcpu" "change the vcpu number attached to the virtual machine"
                 printf "%-20s %-60s\n" "clone" "clone a child virtual machine from the base virtual machine"
+                printf "%-20s %-60s\n" "copy" "copy a new child virtual machine from old child virtual machine"
                 printf "%-20s %-60s\n" "delete" "delete(undefine) a virtual machine"
+                printf "%-20s %-60s\n" "reset" "reset one/multi virtual machines according to pattern"
                 printf "%-20s %-60s\n" "--help" "show this help document"
                 echo ""
                 echo "use vmc <command> --help to get detailed help"
@@ -420,12 +493,28 @@ _help()
                 echo "vmc change-dev <num> <pci_bdf>                   change the VM that matches vats-test.*-xx"
                 echo ""
                 ;;
+        "change-vcpu")
+                echo "NAME"
+                echo "vmc change-vcpu - change the vcpu number attached to the virtual machine"
+                echo ""
+                echo "SYNOPSIS"
+                echo "vmc change-vcpu <domain_name> <vcpu_num>           change the vcpu number of the specific VM"
+                echo ""
+                ;;
         "clone")
                 echo "NAME"
                 echo "vmc clone - clone a child virtual machine from the base virtual machine"
                 echo ""
                 echo "SYNOPSIS"
                 echo "vmc clone <base_domain_name> <child_domain_name>           clone a child VM from the base VM"
+                echo ""
+                ;;
+        "copy")
+                echo "NAME"
+                echo "vmc copy - copy a new child virtual machine from old child virtual machine"
+                echo ""
+                echo "SYNOPSIS"
+                echo "vmc clone <old_child_domain_name> <new_child_domain_name>      clone a new VM from the child VM"
                 echo ""
                 ;;
         "delete")
@@ -483,9 +572,17 @@ case $1 in
         shift
         _change_dev "$@"
         ;;
+"change-vcpu")
+        shift
+        _change_vcpu "$@"
+        ;;
 "clone")
         shift
         _clone_vm "$@"
+        ;;
+"copy")
+        shift
+        _copy_vm "$@"
         ;;
 "delete")
         shift
