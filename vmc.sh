@@ -314,8 +314,7 @@ _clone_vm()
         #echo "$backing_file"
         if [[ -n "$backing_file" ]];
         then
-                echo "$vmlist is a child vm, do not support clone"
-                return 1
+                echo "$vmlist is a child vm, please be carefull during clone"
         fi
         echo "clone VM from $vmlist to $2"
         hda_dir=$(dirname "$hda")
