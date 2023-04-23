@@ -28,9 +28,9 @@ _get_vm_ip ()
 _get_vm_pci ()
 {
         local xml dbsf
-        xml=$(virsh dumpxml "$1" | xmllint --xpath "//domain/devices/hostdev/source/address" -)
+        xml=$(virsh dumpxml "$1" | xmllint --xpath "//domain/devices/hostdev/source/address" - 2> /dev/null)
         if [ -z "$xml" ]; then
-                pci=""
+                pci="no device"
                 return 0
         fi
         dbsf=$(echo "$xml" |  awk -F'[=/< "]' '{print $5 " " $9 " " $13 " " $17}')
@@ -126,11 +126,16 @@ _list_vm()
         vmlist=$(virsh list --all | sed '1,2d')
         if [ "$1" == "-v" ];
         then
-                printf "%-60s %-10s %-20s %-15s %-4s\n" "NAME" "STATE" "IP ADDRESS" "PCI DEVICE" "VCPU_NUM"
+                indent_num=$(expr 50 + 10 + 20 + 15 + 10 + 4)
+                printf "%-50s %-10s %-20s %-15s %-10s\n" "NAME" "STATE" "IP ADDRESS" "PCI DEVICE" "VCPU_NUM"
         else
-                printf "%-60s %-10s %-20s\n" "NAME" "STATE" "IP ADDRESS"
+                indent_num=$(expr 50 + 10 + 20 + 2)
+                printf "%-50s %-10s %-20s\n" "NAME" "STATE" "IP ADDRESS"
         fi
-        printf "==============================================================================================================\n"
+        for i in $(seq 1 $indent_num); do
+                printf "="
+        done
+        printf "\n"
         while read -r vminfo; do
                 name=$(echo "$vminfo" | awk '{print $2}')
                 state=$(echo "$vminfo" | awk '{print $3}')
@@ -149,9 +154,9 @@ _list_vm()
                 then
                         _get_vm_pci "$name"
                         _get_vm_vcpu "$name"
-                        printf "%-60s %-10s %-20s %-15s %-4s\n" "$name" "$state" "$ip" "$pci" "$vcpu"
+                        printf "%-50s %-10s %-20s %-15s %-10s\n" "$name" "$state" "$ip" "$pci" "$vcpu"
                 else
-                        printf "%-60s %-10s %-20s\n" "$name" "$state" "$ip"
+                        printf "%-50s %-10s %-20s\n" "$name" "$state" "$ip"
                 fi
         done <<< "$vmlist"
 }
