@@ -49,7 +49,9 @@ _vmc()
                         pci=$(lspci -D | grep ATI | grep Display | awk -F" " '{print $1}')
                         ;;
                 esac
-                COMPREPLY=( $( compgen -W "$pci" -- ${COMP_WORDS[${COMP_CWORD}]}))
+                cur="${COMP_WORDS[COMP_CWORD]}"
+                COMPREPLY=( $( compgen -W "$pci" -- ${COMP_WORDS[${COMP_CWORD}]} \
+                        | awk '{ print "'\''"$0"'\''" }'))                
         fi
 }
 
